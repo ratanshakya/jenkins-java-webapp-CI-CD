@@ -1,91 +1,69 @@
-pipeline {
+pipeline{
     
-    agent {
-        label "linuxbuildnode"
+    agent{
+        label "slave1aws"
     }
     
-    
-    stages {
-        stage('SCM') {
-            steps {
-                git 'https://github.com/vimallinuxworld13/jenkins-docker-maven-java-webapp.git'
+     
+    stages{
+        stage('scm'){
+            steps{
+              
+            git 'https://github.com/ratanshakya/jenkins-java-webapp-CI-CD.git'
+            }
+        }
+        stage('Build by Maven Package'){
+            steps{
+                  sh 'mvn clean package'
+              
+            }
+        }
+        
+        
+         stage('Build Docker Own Image'){
+            steps{
                 
+              sh 'sudo docker build -t ratan123shakya/javawebapp:${BUILD_TAG} .'
+              
             }
-            
-        }
-        
-        stage('Build by Maven Package') {
-            steps {
-                sh 'mvn clean package'
-            }
-            
         }
         
         
-        stage('Build Docker OWN image') {
-            steps {
-                sh "sudo docker build -t  vimal13/javaweb:${BUILD_TAG}  ."
-                //sh 'whoami'
-            }
-            
-        }
-        
-        
-        stage('Push Image to Docker HUB') {
-            steps {
-                
-                withCredentials([string(credentialsId: 'DOCKER_HUB_PWD', variable: 'DOCKER_HUB_PASS_CODE')]) {
+        stage('Push Docker Image on DockerHub'){
+            steps{
+           withCredentials([string(credentialsId: 'DOCKER_HUB', variable: 'my_pass')]) {
     // some block
-                 sh "sudo docker login -u vimal13 -p $DOCKER_HUB_PASS_CODE"
+                sh "sudo docker login -u ratan123shakya -p ${my_pass}"
 }
-               
-               sh "sudo docker push vimal13/javaweb:${BUILD_TAG}"
+                  sh "sudo docker push ratan123shakya/javawebapp:${BUILD_TAG}"
+                 
             }
-            
+                
+              
         }
         
-        
-        stage('Deploy webAPP in DEV Env') {
-            steps {
-                sh 'sudo docker rm -f myjavaapp'
-                sh "sudo docker run  -d  -p  8080:8080 --name myjavaapp   vimal13/javaweb:${BUILD_TAG}"
-                //sh 'whoami'
+        stage('Deploy WebApp in Dev Env'){
+            steps{
+                 sh 'sudo docker rm -f myjavaapp'
+                 
+              sh "sudo docker run -d -p 8080:8080 --name myjavaapp ratan123shakya/javawebapp:${BUILD_TAG}"
+              
             }
-            
         }
         
-        
-        stage('Deploy webAPP in QA/Test Env') {
-            steps {
-               
-               sshagent(['QA_ENV_SSH_CRED']) {
+         stage('Deploy WebApp on Q/A_Env'){
+            steps{
+                sshagent(['Q/A Team']){
+                 
+                 sh "ssh -o StrictHostKeyChecking=no ec2-user@13.233.148.23 sudo docker rm -f myjavaapp"
+              sh "ssh ec2-user@13.233.148.23 sudo docker run -d -p 8080:8080 --name myjavaapp ratan123shakya/javawebapp:${BUILD_TAG}"
     
-                    sh "ssh  -o  StrictHostKeyChecking=no ec2-user@13.233.100.238 sudo docker rm -f myjavaapp"
-                    sh "ssh ec2-user@13.233.100.238 sudo docker run  -d  -p  8080:8080 --name myjavaapp   vimal13/javaweb:${BUILD_TAG}"
                 }
-
-            }
-            
-        }
-        
-        
-         stage('QAT Test') {
-            steps {
-                
-               // sh 'curl --silent http://13.233.100.238:8080/java-web-app/ |  grep India'
-                
-                retry(10) {
-                    sh 'curl --silent http://13.233.100.238:8080/java-web-app/ |  grep India'
-                }
-            
-               
             }
         }
-          
         
-         
-         
-        stage('approved') {
+        
+       stage('approved') {
             steps {
                 
             
@@ -106,47 +84,21 @@ pipeline {
         }
         
         
-         
         
-        stage('Deploy webAPP in Prod Env') {
-            steps {
-               
-               sshagent(['QA_ENV_SSH_CRED']) {
+        
+        
+         stage('Deploy WebApp on prod_Env'){
+            steps{
+                sshagent(['Q/A Team']){
+                 
+                 sh "ssh -o StrictHostKeyChecking=no ec2-user@13.234.66.17 sudo docker rm -f myjavaapp"
+                 
+                 sh "ssh ec2-user@13.234.66.17 sudo docker run -d -p 8080:8080 --name container ratan123shakya/javawebapp:${BUILD_TAG}"
     
-                    
-                    sh "ssh  -o  StrictHostKeyChecking=no ec2-user@13.232.250.244 sudo kubectl  delete    deployment myjavawebapp"
-                    sh "ssh  ec2-user@13.232.250.244 sudo kubectl  create    deployment myjavawebapp  --image=vimal13/javaweb:${BUILD_TAG}"
-                    sh "ssh ec2-user@13.232.250.244 sudo wget https://raw.githubusercontent.com/vimallinuxworld13/jenkins-docker-maven-java-webapp/master/webappsvc.yml"
-                    sh "ssh ec2-user@13.232.250.244 sudo kubectl  apply -f webappsvc.yml"
-                    sh "ssh ec2-user@13.232.250.244 sudo kubectl  scale deployment myjavawebapp --replicas=5"
                 }
-
             }
-            
-        } 
-        
+        }
     
         
-    }
-    
-  
-        
-     post {
-         always {
-             echo "You can always see me"
-         }
-         success {
-              echo "I am running because the job ran successfully"
-         }
-         unstable {
-              echo "Gear up ! The build is unstable. Try fix it"
-         }
-         failure {
-             echo "OMG ! The build failed"
-             mail bcc: '', body: 'hi check this ..', cc: '', from: '', replyTo: '', subject: 'job ete fail', to: 'vdaga@lwindia.com'
-         }
-     }
-
-    
-    
+}
 }
